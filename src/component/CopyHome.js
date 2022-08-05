@@ -1,11 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { v4 as uuid } from "uuid";
+import { Icon } from "react-icons-kit";
+import { androidDelete } from "react-icons-kit/ionicons/androidDelete";
+import { compose } from "react-icons-kit/ionicons/compose";
 
 function Home() {
   const [notes, setNotes] = useState({ title: "", desc: "" });
   const [items, setItems] = useState(getDataFromStorage());
   const [toggleBtn, setToggleBtn] = useState(true);
   const [editNoteId, setEditNoteId] = useState(0);
+  const [backup, setBackup] = useState(GetBackupData());
+  const [storageBtn, setStorageBtn] = useState(false);
+  const [hide, setHide] = useState(false);
 
   const { title, desc } = notes;
 
@@ -18,8 +24,42 @@ function Home() {
     }
   }
 
+  function GetBackupData() {
+    const data = localStorage.getItem("BACKUP");
+
+    if (data) {
+      return JSON.parse(data);
+    } else {
+      return [];
+    }
+  }
+
+  // function GetArchiveData() {
+  //   const data = localStorage.getItem("ARCHIVE");
+  //   if (data) {
+  //     return JSON.parse(data);
+  //   } else {
+  //     return [];
+  //   }
+  // }
+
   function getInputValue(e) {
     setNotes({ ...notes, [e.target.name]: e.target.value });
+  }
+
+  function CheckMultiple(id) {
+    let arr = [];
+    items.forEach((i) => {
+      if (i.id === id) {
+        if (i.completed === false) {
+          i.completed = true;
+        } else if (i.completed === true) {
+          i.completed = false;
+        }
+      }
+      arr.push(i);
+      setItems(arr);
+    });
   }
 
   function addNotesData(e) {
@@ -34,6 +74,7 @@ function Home() {
               date: new Date().toLocaleString(),
               title: title,
               desc: desc,
+              completed: false,
             };
           }
           return ele;
@@ -45,38 +86,122 @@ function Home() {
       setToggleBtn(true);
     } else {
       const data_with_id = {
-        //id: new Date().getTime().toString(),
         id: uuid(),
         date: new Date().toLocaleString(),
         title: title,
         desc: desc,
+        completed: false,
       };
       setItems([...items, data_with_id]);
       setNotes({ title: "", desc: "" });
     }
   }
 
-  function deleteNotes(id) {
-    const delete_note = items.filter((ele) => {
-      return id !== ele.id;
-    });
-    setItems(delete_note);
+  function DeleteSelcted() {
+    let deleted_data = [];
+
+    if (window.confirm("Are you sure to deleted selected Notes")) {
+      let selected = items.filter((i) => {
+        if (i.completed === true) {
+          deleted_data.push(...backup, i);
+        }
+        return i.completed !== true;
+      });
+
+      // deleted_data.forEach((i) => {
+      //   return (i.completed = false);
+      // });
+      setBackup(deleted_data);
+      setItems(selected);
+    }
   }
+
+  function deleteNotes(id) {
+    let ind_del = [];
+
+    if (window.confirm("Are you sure ?")) {
+      const delete_note = items.filter((ele) => {
+        if (ele.id === id) {
+          ind_del.push(...backup, ele);
+        }
+        return id !== ele.id;
+      });
+
+      // ind_del.forEach((i) => {
+      //   return (i.completed = false);
+      // });
+      setBackup(ind_del);
+      setItems(delete_note);
+    }
+  }
+
+  function Restore() {
+    let arr = [];
+    if (backup.length > 0) {
+      backup.forEach((i) => {
+        i.completed = false;
+        arr.push(i);
+      });
+      setItems([...arr, ...items]);
+      alert("Deleted Notes Restored Successfully");
+      setStorageBtn(false);
+    } else {
+      setStorageBtn(true);
+    }
+
+    setBackup([]);
+  }
+
   function editNotes(id) {
     let edit_item = items.find((ele) => {
       return ele.id === id;
     });
 
     setEditNoteId(id);
-
     setNotes({ title: edit_item.title, desc: edit_item.desc });
-
     setToggleBtn(false);
+  }
+
+  // function Archive() {
+  //   let archive_data = [];
+  //   let selected = items.filter((i) => {
+  //     if (i.completed === true) {
+  //       archive_data.push(...archive, i);
+  //     }
+  //     return i.completed !== true;
+  //   });
+
+  //   // archive_data.forEach((i) => {
+  //   //   return (i.completed = false);
+  //   // });
+  //   setArchive(archive_data);
+  //   setItems(selected);
+  // }
+
+  function ShowAll() {
+    setHide(!hide);
   }
 
   useEffect(() => {
     localStorage.setItem("NOTES", JSON.stringify(items));
   }, [items]);
+
+  useEffect(() => {
+    localStorage.setItem("BACKUP", JSON.stringify(backup));
+  }, [backup]);
+
+  // useEffect(() => {
+  //   localStorage.setItem("ARCHIVE", JSON.stringify(archive));
+  // }, [archive]);
+
+  useEffect(() => {
+    if (backup.length > 0) {
+      setStorageBtn(false);
+    } else {
+      setStorageBtn(true);
+    }
+  }, [backup.length]);
+
   return (
     <>
       <div className="notes">
@@ -92,7 +217,6 @@ function Home() {
             value={title}
             onChange={(e) => getInputValue(e)}
           />
-
           <label htmlFor="Description" className="form-lable">
             Enter Notes Description
           </label>
@@ -104,18 +228,52 @@ function Home() {
           ></textarea>
           <br />
           {toggleBtn ? (
-            <button className="btn btn-primary " onClick={addNotesData}>
+            <button className="btn btn-primary note-btn" onClick={addNotesData}>
               <b>Add Notes</b>
             </button>
           ) : (
-            <button className="btn btn-success " onClick={addNotesData}>
+            <button className="btn btn-success note-btn" onClick={addNotesData}>
               <b>Update Note</b>
             </button>
           )}
+
+          {hide ? (
+            <button className="btn btn-warning note-btn" onClick={ShowAll}>
+              Hide all
+            </button>
+          ) : (
+            <button className="btn btn-primary note-btn" onClick={ShowAll}>
+              Show All
+            </button>
+          )}
+
+          <button
+            className={
+              storageBtn ? "btn btn-dark note-btn" : "btn btn-info note-btn"
+            }
+            disabled={storageBtn}
+            onClick={Restore}
+          >
+            Backup
+          </button>
+
+          {/* <button className="btn btn-success note-btn" onClick={Archive}>
+            Archive
+          </button> */}
+
+          <button onClick={DeleteSelcted} className="btn btn-danger note-btn">
+            Delete Checked
+          </button>
+          {/* <button className="btn btn-danger note-btn" onClick={ShowAll}>
+            Delete All
+          </button> */}
         </div>
       </div>
       <div className="display-notes">
-        <div className="container">
+        <div
+          className="container"
+          style={hide ? { display: "block" } : { display: "none" }}
+        >
           <div className="row">
             {items.map((ele, index) => {
               return (
@@ -123,27 +281,35 @@ function Home() {
                   <div className="col-4">
                     <div
                       className="card "
-                      style={{ width: " 18rem" }}
+                      style={{ width: "15rem" }}
                       key={index}
                     >
                       <div className="card-body">
-                        <h5 className="card-title">Title : {ele.title}</h5>
+                        <h5 className="card-title">
+                          <span>
+                            <input
+                              type="checkbox"
+                              checked={ele.completed}
+                              onChange={() => {
+                                CheckMultiple(ele.id);
+                              }}
+                            />
+                          </span>
+                          {"  "}
+                          Title : {ele.title}
+                        </h5>{" "}
                         <p className="card-text">Desc: {ele.desc}</p>
                         <p>{ele.date}</p>
-                        <button
+                        <Icon
                           className="btn btn-success"
-                          onClick={() => {
-                            editNotes(ele.id);
-                          }}
-                        >
-                          Edit
-                        </button>{" "}
-                        <button
+                          icon={compose}
+                          onClick={() => editNotes(ele.id)}
+                        />{" "}
+                        <Icon
                           className="btn btn-danger"
+                          icon={androidDelete}
                           onClick={() => deleteNotes(ele.id)}
-                        >
-                          Delete
-                        </button>
+                        />
                       </div>
                     </div>
                     <br />
@@ -153,7 +319,6 @@ function Home() {
             })}
           </div>
         </div>{" "}
-        <div> </div>
       </div>
       <br />
     </>
